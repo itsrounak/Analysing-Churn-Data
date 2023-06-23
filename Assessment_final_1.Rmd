@@ -1,0 +1,637 @@
+---
+title: "Assessment_1"
+author: "Luka.C, Harris.P, Jason.S, Rounak.A"
+date: "09/09/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readr)
+library(survminer)
+library(survival)
+library(broom)
+library(ggfortify)
+library(tidyr)
+library(tinytex)
+## Remove the line break in the file name! churn_dat <-
+churn_dat <-read_csv("https://raw.githubusercontent.com/square/pysurvival/master/pysurvival/datasets/churn.csv")
+churn_dat <- churn_dat %>% filter(months_active > 0)
+set.seed(12345)
+```
+
+## Kaplan Meier
+
+```{r Q1-function}
+#t = at a particular time period
+#n = # of the individuals that are still surviving at t (i.e customer still using our services)
+#d = # of event at t (i.e customer left)
+KM_estimate <- function (time, event) 
+{
+    sorted_time <- sort(time)
+    event <- event[order(time)] # event being ordered
+    ni <- length(time):1
+    ni <- ni[!duplicated(sorted_time)]
+    di <- tapply(event, sorted_time, sum)
+    ti <- unique(sorted_time)
+    si <- (ni - di)/ni
+    cum_survivial_i <- cumprod(si)
+    cum_risk_i <- 1 - cum_survivial_i
+    results <- cbind(time = ti, n_risk = ni, n_events = di, condsurv = si, 
+        survival = cum_survivial_i, risk = cum_risk_i)
+    dimnames(results)[1] <- list(NULL)
+    results[, ]
+}
+```
+
+## Plot full data
+
+```{r Q1-Plot-full_data}
+time <-  churn_dat$months_active 
+event <- churn_dat$churned
+result <- KM_estimate(time, event)
+result <- as.data.frame(result)
+```
+
+```{r}
+ggplot(result, aes(x=time, y = survival))+
+  geom_point()+
+  geom_step ()+
+  theme_bw()+
+  ggtitle("The Kaplan-Meier curve for the full data") + 
+  labs(x= 'Time',
+         y="Prob.Survival")
+```
+
+## Plot for each individual company size
+
+```{r}
+df_10to50 <-  churn_dat %>% filter(company_size == "10-50")
+s1_time <-  df_10to50$months_active 
+s1_event <- df_10to50$churned
+s1_result <- KM_estimate(s1_time, s1_event)
+s1_result <- as.data.frame(s1_result)
+#100-250
+df_100to250 <- churn_dat %>% filter(company_size ==  "100-250")
+s2_time <-  df_100to250$months_active 
+s2_event <- df_100to250$churned
+s2_result <- KM_estimate(s2_time, s2_event)
+s2_result <- as.data.frame(s2_result)
+#"50-100" 
+df_50to100 <- churn_dat %>% filter(company_size ==  "50-100")
+s3_time <-  df_50to100$months_active 
+s3_event <- df_50to100$churned
+s3_result <- KM_estimate(s3_time, s3_event)
+s3_result <- as.data.frame(s3_result)
+#"1-10"
+df_1to10 <- churn_dat %>% filter(company_size ==  "1-10")
+s4_time <-  df_1to10$months_active 
+s4_event <- df_1to10$churned
+s4_result <- KM_estimate(s4_time, s4_event)
+s4_result <- as.data.frame(s4_result)
+# "self-employed"
+df_self_employed <- churn_dat %>% filter(company_size ==  "self-employed")
+s5_time <-  df_self_employed$months_active 
+s5_event <- df_self_employed$churned
+s5_result <- KM_estimate(s5_time, s5_event)
+s5_result <- as.data.frame(s5_result)
+```
+
+```{r plot-by-sizes}
+colors <- c("10-50"="red", "100-250" = "blue","50-100" = "green","1-10" = "pink","self-employed" = "black")
+ggplot()+
+    geom_step(data =s1_result,  
+              aes(x=time, y = survival,
+              color = "10-50"),
+              size = 1.5)+
+    geom_step(data =s2_result,  
+              aes(x=time, y = survival,
+              color = "100-250"),
+              size = 1.5)+
+    geom_step(data =s3_result,  
+              aes(x=time, y = survival,
+              color = "50-100"),
+              size = 1.5)+
+    geom_step(data =s4_result,  
+              aes(x=time, y = survival,
+              color = "1-10"),
+              size = 1.5)+
+    geom_step(data =s5_result,  
+              aes(x=time, y = survival,
+              color = "self-employed"),
+              size = 1.5,
+              linetype = 2)+
+    labs(x= 'Time',
+         y="Prob.Survival",
+         color = 'Legend')+
+        scale_color_manual(values = colors)+
+    theme_bw()+
+    theme(legend.position = c(.15,.26))+
+    ggtitle("The Kaplan-Meier curve for each company size")
+```
+
+
+## Interpretation :
+
+### The Kaplan-Meier curves for each respective company size are overall pretty similar in shape. They all exhibit the same early drop offs in survival probability followed by more stability in the back two thirds of the time period.
+
+### The somewhat outlier of the group however is the company size of 100 to 250 clients. Its curve drops lower, a lot earlier than the rest of the curves, this indicates it is losing customers quicker than the others and, with the curve finishing lowest out of the five, also illustrates that it has a lower rate of keeping customers long term and hence a higher customer churn rate. Another interesting feature of the graph is the self-employed data. The graph for the self-employed companies shows the graph running off from about time 6 indicating that no more clients had churned from that point onwards to the point of censoring. However, this company size also had the lowest number of observations being only 62 which could explain the disparity in customer churn to the other companies. 
+
+### Although size of data definitely plays a role in determining the shape and pattern of the graphs, a more logical reason to explain the graphs could be that companies with larger numbers of clients may struggle to attain the same depth and quality of business-client relations as their low client number counterparts, hence resulting in higher customer churn rates.
+
+
+# Question 2
+
+## Function to find median
+
+```{r function-to-find-median}
+near_median <- function(fit){
+  if (length(fit$n) > 1) {
+    stop("This only works for a single survival curve!")
+  }
+  index <- which.min(abs(fit$surv - 0.5))
+  return(fit$time[index])
+}
+average_median <- function(fit) {
+if (length(fit$n) > 1) {
+stop("This only works for a single survival curve!")
+}
+suppressWarnings(lower_ind <- which.min(log(fit$surv - 0.5)))
+suppressWarnings(upper_ind <- which.min(log(0.5 - fit$surv)))
+return((fit$time[lower_ind] + fit$time[upper_ind])/2)
+}
+```
+
+## Filter data
+
+```{r filter_df}
+filter_df <- function(size){
+df <- churn_dat %>% filter(company_size == size)
+time <-  df$months_active 
+event <- df$churned
+fit <- surv_fit(Surv(time,event)~1, data = df) 
+return(fit)
+}
+```
+
+```{r 10-50}
+#here estimate median based on sizes
+fit <- filter_df("10-50")
+fit %>% tidy()
+s1_median <- average_median(fit)
+```
+
+### The median time is where the survival probability is equal to 0.5. Although there is no exact time where this occurs we know that the median exists between times 5 and 6. As the survival probabilities of the two times are near equally far from 0.5 (which are  0.505 and  0.493 respectively).
+
+### Therefore, for size 10-50, the average median is `r average_median(fit)`
+
+```{r 100-250}
+#here estimate median based on sizes
+fit <- filter_df("100-250")
+fit %>% tidy()
+s2_median <- near_median(fit)
+```
+
+### The median time is where the survival probability is equal to 0.5. Although there is no exact time where this occurs we know that the median exists between times 5 and 6. As the survival probabilities of the two times are NOT  nearly equal to 0.5 (which are  0.54 and  0.45 respectively), we can use the average median of 5.5 as the most suitable measure of the median.
+
+### Therefore, for size 100-250, the near median is `r near_median(fit)`
+
+```{r 50-100}
+#here estimate median based on sizes
+fit <- filter_df("50-100")
+fit %>% tidy()
+s3_median <- average_median(fit)
+```
+
+
+### The median time is where the survival probability is equal to 0.5. Although there is no exact time where this occurs we know that the median exists between times 5 and 6. As the survival probabilities of the two times are  nearly equal to  0.5 (which are  0.51 and  0.48 respectively)
+
+### Therefore, for size 50-100, the near median is `r average_median(fit)`
+
+```{r 1-10}
+#here estimate median based on sizes
+fit <- filter_df("1-10")
+fit %>% tidy()
+s4_median <- average_median(fit)
+```
+
+### The median time is where the survival probability is equal to 0.5. Although there is no exact time where this occurs we know that the median exists between times 5 and 6. As the survival probabilities of the two times are  nearly equal to  0.5 (which are  .50 and  .49 respectively)
+
+### Therefore, for size 1-10, the near median is `r average_median(fit)`
+
+```{r self-employed}
+#here estimate median based on sizes
+fit <- filter_df("self-employed")
+fit %>% tidy()
+s5_median <- average_median(fit)
+```
+
+### The median time is where the survival probability is equal to 0.5. Although there is no exact time where this occurs we know that the median exists between times 5 and 6. As the survival probabilities of the two times are  nearly equal to  0.5 (which are  .50 and  .47 respectively)
+
+### Therefore, for size "self-employed", the near median is `r average_median(fit)`
+
+## Part 2
+
+### Since the previously defined function could only work for a single survival curve, therefore, this function is made. 
+
+### The following function was reference from surv_median from the survminer package. Nonetheless, its the median survival with upper and lower confidence limits for the median at 95% confidence levels. So, I changed it to a way that it can compute the median at 90% CI instead. 
+
+```{r median_at_90_percent}
+median_at_90_percent <- function (fit, combine = FALSE) 
+{
+    .median <- function(fit) {
+        if (!is.null(fit$strata) | is.matrix(fit$surv)) {
+            .table <- as.data.frame(summary(fit)$table)
+        }
+        else {
+            .table <- t(as.data.frame(summary(fit)$table)) %>% 
+                as.data.frame()
+            rownames(.table) <- "All"
+        }
+        .table$strata <- rownames(.table)
+        .table <- .table %>% dplyr::select_(.dots = c("strata", 
+            "median", "`0.9LCL`", "`0.9UCL`"))
+        colnames(.table) <- c("strata", "median", 
+            "lower", "upper")
+        rownames(.table) <- NULL
+        .table
+    }
+   .median(fit)
+}
+```
+
+## Function for plotting histogram
+
+```{r plotting-hist}
+#create a function for plotting
+plot_boot_data <- function(experiments, size, s_median){
+  fit <- survfit(Surv(time_star, event_star) ~ experiment, data = experiments,conf.int= 0.9)
+  #get the median of surv
+  surv_med <- median_at_90_percent(fit)
+  surv_med <- data.frame(surv_med)
+  med <-  surv_med$median
+  med <- data.frame(med)
+  #get the upper CI
+  upper <-  mean(surv_med$upper, na=T)
+  #get the lower CI
+  lower <- mean(surv_med$lower, na=T) 
+  ggplot(med , aes(x = med, fill= med)) +
+    geom_histogram(binwidth = .8)+
+    geom_vline(xintercept = upper, colour="blue",linetype="dashed")+
+    geom_vline(xintercept = lower, colour="blue",linetype="dashed")+
+    geom_vline(xintercept = s_median, colour="black")+
+    ggtitle(  paste("The estimate of the median for", size))+
+      labs(x= 'Median',
+         y="Count")+
+    theme_bw()
+    
+}
+```
+
+## Bootstrap
+
+```{r bootstrap}
+#create a function of  the dataframe by sizes
+boot <- function(size,n_sims){
+#1. filter data into a particular size
+df <- churn_dat %>% filter(company_size == size)
+n <-  nrow(df)
+#2. run the bootstrap
+experiments <-  tibble(experiment = rep(1:n_sims, each = n),
+                     index = sample(1:n, size = n * n_sims, replace = TRUE),
+                     time_star = df$months_active[index],
+                     event_star = df$churned[index])
+return(experiments)
+}
+```
+
+## Histograms with confidence intervals for median
+
+### The graphs shown for each company size show the bootstrapped median data accompanied by the 90% confidence intervals for the said median in blue dashed lines, and the median found from the original churn data in a solid black line.
+
+```{r, warning=FALSE}
+set.seed(999)
+#"10-50"
+df_10to50 <- boot("10-50",1000)
+plot_boot_data(df_10to50, "10-50",s1_median)
+#"100-250"
+df_100to250 <- boot("100-250",1000)
+plot_boot_data(df_100to250,"100-250",s2_median)
+#"50-100"
+df_50to100 <- boot("50-100",1000)
+plot_boot_data(df_50to100,"50-100",s3_median)
+#"1-10"              
+df_1to10 <- boot("1-10",1000)
+plot_boot_data(df_1to10,"1-10",s4_median)
+#"self-employed"
+df_self_employed <- boot("self-employed",1000)
+plot_boot_data(df_self_employed,"self-employed",s5_median)
+```
+
+## Overall Comment on Median Churn Time:
+
+### Overall, the median churn times across all five company sizes doesn't change a whole lot. For the three biggest sizes being; 10-50, 50-100, and 100-250, the median churn time was 5.5 months for all of them. This indicates that on average, they lose half of their customers within the first 5.5 months of gaining their business.
+
+### It would seem fitting that smaller client size businesses would have a greater capability to hold on to customers and hence have a larger median churn time. This rings true for the median of 6.5 for size 1-10, but does not hold for the self-employed companies who obtained a median churn time of 5. This was the only company size who's median was better calculated by the near-median method and due to the significant lack of observations compared to its larger size counterparts, could have a median that perhaps poorly represents the true population.
+
+### Although it may have the smallest median churn time, the self-employed company data actually sustained a steady level of survival probability from the median time onwards a lot better than the other sizes. Suggesting that although it may lose the same amount of customers (proportionately) a lot quicker than the other company sizes, it overall holds on to them a lot better in the long run.
+
+# Question 3
+
+```{r Packages and data, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(survminer)
+library(survival)
+library(broom)
+library(MASS)
+library(ggfortify)
+library(knitr)
+library(tinytex)
+churn_dat <-read_csv("https://raw.githubusercontent.com/square/pysurvival/master/pysurvival/datasets/churn.csv")
+churn_dat <- churn_dat %>% filter(months_active > 0)
+```
+
+## Filter data 
+
+```{r Filter relevnat data}
+churn_dat_50_100 <- churn_dat %>% filter(company_size == "50-100")
+
+fit_hat <- survfit(Surv(months_active, churned) ~ 1, data = churn_dat_50_100) %>% tidy()
+```
+
+## Bootstarp
+
+```{r, message=FALSE}
+set.seed(1888)
+n = nrow(churn_dat_50_100)
+n_sims = 10000
+
+experiments = tibble(experiment = rep(1:n_sims, each = n),
+                     index = sample(1:n, size = n * n_sims, replace = TRUE),
+                     time_star = churn_dat_50_100$months_active[index],
+                     event_star = churn_dat_50_100$churned[index])
+
+bias <- experiments %>%
+  group_by(experiment) %>%
+  summarise(fortify(fit <- survfit(Surv(time_star, event_star) ~ 1)))
+```
+
+## 90% Confidence Intervals for each time point
+
+```{r}
+dist_t1 <- bias %>% filter(time == 1)
+dist_t1 <- tibble(est_star = dist_t1$surv,
+                  est_hat = rep(fit_hat$estimate[1]),
+                  delta_star = est_hat - est_star)
+conf_t1 <- tibble(lower = fit_hat$estimate[1] + quantile(dist_t1$delta_star, 0.05),
+                  upper = fit_hat$estimate[1] + quantile(dist_t1$delta_star, 0.95))
+
+dist_t2 <- bias %>% filter(time == 2)
+dist_t2 <- tibble(est_star = dist_t2$surv,
+                  est_hat = rep(fit_hat$estimate[2]),
+                  delta_star = est_hat - est_star)
+conf_t2 <- tibble(lower = fit_hat$estimate[2] + quantile(dist_t2$delta_star, 0.05),
+                  upper = fit_hat$estimate[2] + quantile(dist_t2$delta_star, 0.95))
+
+dist_t3 <- bias %>% filter(time == 3)
+dist_t3 <- tibble(est_star = dist_t3$surv,
+                  est_hat = rep(fit_hat$estimate[3]),
+                  delta_star = est_hat - est_star)
+conf_t3 <- tibble(lower = fit_hat$estimate[3] + quantile(dist_t3$delta_star, 0.05),
+                  upper = fit_hat$estimate[3] + quantile(dist_t3$delta_star, 0.95))
+
+dist_t4 <- bias %>% filter(time == 4)
+dist_t4 <- tibble(est_star = dist_t4$surv,
+                  est_hat = rep(fit_hat$estimate[4]),
+                  delta_star = est_hat - est_star)
+conf_t4 <- tibble(lower = fit_hat$estimate[4] + quantile(dist_t4$delta_star, 0.05),
+                  upper = fit_hat$estimate[4] + quantile(dist_t4$delta_star, 0.95))
+
+dist_t5 <- bias %>% filter(time == 5)
+dist_t5 <- tibble(est_star = dist_t5$surv,
+                  est_hat = rep(fit_hat$estimate[5]),
+                  delta_star = est_hat - est_star)
+conf_t5 <- tibble(lower = fit_hat$estimate[5] + quantile(dist_t5$delta_star, 0.05),
+                  upper = fit_hat$estimate[5] + quantile(dist_t5$delta_star, 0.95))
+
+dist_t6 <- bias %>% filter(time == 6)
+dist_t6 <- tibble(est_star = dist_t6$surv,
+                  est_hat = rep(fit_hat$estimate[6]),
+                  delta_star = est_hat - est_star)
+conf_t6 <- tibble(lower = fit_hat$estimate[6] + quantile(dist_t6$delta_star, 0.05),
+                  upper = fit_hat$estimate[6] + quantile(dist_t6$delta_star, 0.95))
+
+dist_t7 <- bias %>% filter(time == 7)
+dist_t7 <- tibble(est_star = dist_t7$surv,
+                  est_hat = rep(fit_hat$estimate[7]),
+                  delta_star = est_hat - est_star)
+conf_t7 <- tibble(lower = fit_hat$estimate[7] + quantile(dist_t7$delta_star, 0.05),
+                  upper = fit_hat$estimate[7] + quantile(dist_t7$delta_star, 0.95))
+
+dist_t8 <- bias %>% filter(time == 8)
+dist_t8 <- tibble(est_star = dist_t8$surv,
+                  est_hat = rep(fit_hat$estimate[8]),
+                  delta_star = est_hat - est_star)
+conf_t8 <- tibble(lower = fit_hat$estimate[8] + quantile(dist_t8$delta_star, 0.05),
+                  upper = fit_hat$estimate[8] + quantile(dist_t8$delta_star, 0.95))
+
+dist_t9 <- bias %>% filter(time == 9)
+dist_t9 <- tibble(est_star = dist_t9$surv,
+                  est_hat = rep(fit_hat$estimate[9]),
+                  delta_star = est_hat - est_star)
+conf_t9 <- tibble(lower = fit_hat$estimate[9] + quantile(dist_t9$delta_star, 0.05),
+                  upper = fit_hat$estimate[9] + quantile(dist_t9$delta_star, 0.95))
+
+dist_t11 <- bias %>% filter(time == 11)
+dist_t11 <- tibble(est_star = dist_t11$surv,
+                  est_hat = rep(fit_hat$estimate[10]),
+                  delta_star = est_hat - est_star)
+conf_t11 <- tibble(lower = fit_hat$estimate[10] + quantile(dist_t11$delta_star, 0.05),
+                   upper = fit_hat$estimate[10] + quantile(dist_t11$delta_star, 0.95))
+
+dist_t12 <- bias %>% filter(time == 12)
+dist_t12 <- tibble(est_star = dist_t12$surv,
+                  est_hat = rep(fit_hat$estimate[11]),
+                  delta_star = est_hat - est_star)
+conf_t12 <- tibble(lower = if(fit_hat$estimate[11] + quantile(dist_t12$delta_star, 0.05) > 0){
+  print(fit_hat$estimate[11] + quantile(dist_t12$delta_star, 0.05))
+} else {
+  0
+},
+
+                   upper = fit_hat$estimate[11] + quantile(dist_t12$delta_star, 0.95))
+```
+
+## Table of confidence intervals
+
+```{r, tidy=TRUE, echo=FALSE}
+conf_int_full <- bind_rows(conf_t1, conf_t2, conf_t3, conf_t4, conf_t5, conf_t6, conf_t7, conf_t8, conf_t9, conf_t11, conf_t12)
+t_col = c(1,2,3,4,5,6,7,8,9,11,12)
+conf_int_full <- cbind(t_col, conf_int_full)
+conf_int_full <- tibble(t = conf_int_full$t_col,
+                        lower = conf_int_full$lower,
+                        upper = conf_int_full$upper)
+kable(conf_int_full)
+```
+
+### Comparing the confidence intervals to the confidence intervals for the median in questioin 2, we can see that the value of 0.5 could possibly land at a time value of either 5 or 6 which is consistant with the results of the confidence interval for the median in question 2.
+
+## Coverage of Confidence Intervals, the probability that the true survival function lies inside all of the CI bounds for all values of t
+
+```{r, warning=FALSE}
+coverage <- mean(dist_t1$est_star > conf_t1$lower[1] & dist_t1$est_star < conf_t1$upper[1] &
+       dist_t2$est_star > conf_t2$lower[1] & dist_t2$est_star < conf_t2$upper[1] &
+       dist_t3$est_star > conf_t3$lower[1] & dist_t3$est_star < conf_t3$upper[1] &
+       dist_t4$est_star > conf_t4$lower[1] & dist_t4$est_star < conf_t4$upper[1] &
+       dist_t5$est_star > conf_t5$lower[1] & dist_t5$est_star < conf_t5$upper[1] &
+       dist_t6$est_star > conf_t6$lower[1] & dist_t6$est_star < conf_t6$upper[1] &
+       dist_t7$est_star > conf_t7$lower[1] & dist_t7$est_star < conf_t7$upper[1] &
+       dist_t8$est_star > conf_t8$lower[1] & dist_t8$est_star < conf_t8$upper[1] &
+       dist_t9$est_star > conf_t9$lower[1] & dist_t9$est_star < conf_t9$upper[1] &
+       dist_t11$est_star > conf_t11$lower[1] & dist_t11$est_star < conf_t11$upper[1] &
+       dist_t12$est_star > conf_t12$lower[1] & dist_t12$est_star < conf_t12$upper[1])
+print(coverage)
+```
+
+### The coverage or in other words the probability that the true survival function is contained within these confidence intervals for each value of time for a company size of 50-100 is `r coverage`. This is because we have computed a 90% confidence interval for each value of t, that is the probability that the true parameter for that t value falls within that interval. The more intervals you have the lower the probability that the true survival functions is contained purely within those bounds.
+
+# Question 4
+
+```{r Load packages, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(survminer)
+library(survival)
+library(MASS)
+library(broom)
+library(ggfortify)
+library(knitr)
+library(tinytex)
+```
+
+```{r, message=FALSE, echo=FALSE}
+churn_dat <-read_csv("https://raw.githubusercontent.com/square/pysurvival/master/pysurvival/datasets/churn.csv")
+churn_dat <- churn_dat %>% filter(months_active > 0)
+```
+
+## Filtering data
+
+```{r Filtering data}
+churn_dat_50_100 <- churn_dat %>% filter(company_size == "50-100")
+churn_dat_50_100 <- tibble(months_active = churn_dat_50_100$months_active,
+                           churned = churn_dat_50_100$churned)
+
+churn_dat_100_250 <- churn_dat %>% filter(company_size == "100-250")
+churn_dat_100_250 <- tibble(months_active = churn_dat_100_250$months_active,
+                           churned = churn_dat_100_250$churned)
+```
+
+## Creating a matrix to smaple from
+
+```{r Creating a matrix to sample from}
+x <- Surv(churn_dat_50_100$months_active, churn_dat_50_100$churned)
+y <- Surv(churn_dat_100_250$months_active, churn_dat_100_250$churned)
+
+z <-  c(x, y)
+```
+
+## Function for computing the test-statistic
+
+```{r Test Stat Function}
+z_stat <- function(var1, var2){
+
+e = fit_x$n * (var1$d + var2$d)/(fit_x$n + fit_y$n)
+
+v = e*((var1$n + var2$n - var1$d - var2$d)/(var1$n + var2$n))* (var2$n/(var1$n + var2$n - 1))
+
+z = ((sum(var1$d - e))/(sqrt(sum(v))))
+
+return(z)
+}
+```
+
+## Loop to repeat permutation samples from Z
+
+```{r Permutation of Test Stat, warning=FALSE}
+set.seed(1888)
+n = 10000
+z_stat_matrix <- matrix(0, ncol = n)
+for(i in 1:n)
+  {
+nx <- length(x)
+ny <- length(y)
+
+z_star <- sample(z, replace = FALSE)
+
+x_star <- z_star[1:nx]
+y_star <- z_star[(nx + 1):(nx + ny)]
+
+fit_x1 <- survfit(x_star ~ 1) %>% tidy()
+fit_x <- tibble(n = fit_x1$n.risk,
+                d = fit_x1$n.event)
+fit_y1 <- survfit(y_star ~ 1) %>% tidy()
+fit_y <- tibble(n = fit_y1$n.risk,
+                d = fit_y1$n.event)
+
+s_stats = z_stat(fit_x, fit_y)
+
+z_stat_matrix[,i] <- s_stats
+}
+```
+
+```{r Observed Test Statistic}
+x_obs <- survfit(x ~ 1) %>% tidy()
+x_obs <- tibble(n = x_obs$n.risk,
+                d = x_obs$n.event)
+y_obs <- survfit(y ~ 1) %>% tidy()
+y_obs <- tibble(n = y_obs$n.risk,
+                d = y_obs$n.event)
+obs_test_stat <- z_stat(x_obs, y_obs)
+```
+
+## Graph of results
+### As can be seen from the graph below whem the distribution of the t-stat is scaled to a PDF is approaches a N(0, 1) distribution which is shown by the red dashed line, in addition our observed t-stat falls quite far to the left at a value of `r round(obs_test_stat, digits = 2)` . This information alone leads us to believe that the survival curves of company size 50-100 and 100-250 are different.
+
+```{r Graph of T-stat distribution and observed test statistic}
+z_plot <- data.frame(data = t(z_stat_matrix))
+
+z_plot %>% ggplot(aes(x = data)) + geom_histogram(aes(y = after_stat(density)),
+                                                  bins = 50,
+                                                  colour = "black",
+                                                  fill = "blue",
+                                                  alpha = 0.5) +
+  stat_function(fun = dnorm, colour = "red", linetype = "dashed", size = 1) +
+  ggtitle("Distribution of Z-Stat under Null Hypothesis") +
+  xlab("Z-Stat") + ylab("Density") + 
+  geom_vline(xintercept =  obs_test_stat, linetype = "dotted", colour = "green", size = 1.2) +
+  theme_bw()
+```
+
+## Permutation confidence interval
+### The permutation 95% confidence interval finds the the values for which 2.5% of the data is below and 2.5% of the data is above. 
+
+```{r Permutation confidence interval}
+perm_conf_int <- tibble(lower = quantile(z_stat_matrix, 0.025),
+                        upper = quantile(z_stat_matrix, 0.975))
+kable(perm_conf_int)
+```
+
+## CLT Confidence Interval
+### The Central  limit theorem confidence interval states that for a normal distribution with a given mean and standard deviation, that 95% of the values lie between 1.96 time the standard deviation above and below the mean.
+
+```{r CLT confidence interval}
+clt_mean <- mean(z_stat_matrix)
+clt_sd <- sd(z_stat_matrix)
+clt_conf_int <- tibble(lower = qnorm(0.025, mean = clt_mean, sd = clt_sd),
+                       upper = qnorm(0.975, mean = clt_mean, sd = clt_sd))
+kable(clt_conf_int)
+```
+
+### As can be seen there is slight differences in the clt confidence interval and the permutation confidence interval which is expected. This is due to the fact that with a large enough number of samples under the null hypotheis, that being the survival curves are the same, thus come from the same set of data the distribution of the t-stat approaches a normal distribution with a mean of 0 and standard deviation of 1. Our observed test statistic between company sizes of 50-100 and 100-250 was `r round(obs_test_stat, digits = 2)` which is outside both the permutation and clt confidence interval. We can treat these confidence intervals as t-stats for two tailed hypothesis test at a 5% significance level. As our observed test statistic was `r round(obs_test_stat, digits = 2)` we can conclude that we have sufficient evidence to reject the null hypothesis in favour of the alternative hypothesis. Where the null is that they have the same survival curves and the alternative being they have different survival curves.
